@@ -2,30 +2,22 @@ function MOD = my_differentiator(uniqID)
 %-----------------------------
 %
 % 1. variables:
-% - IO name(s):                      vpn, ipn
-% - explicit output name(s):         ipn
-% - other IO name(s) (vecX):         vpn
+% - IO name(s):                      vpinref, vpoutref, ipinref, ipoutref
+% - explicit output name(s):         ipinref, vpoutref
+% - other IO name(s) (vecX):         vpinref, ipoutref
 % - implicit unknown name(s) (vecY): {}
 % - input name(s) (vecU):            {}
 %
 % 2. equations:
-% - basic capacitor equation:
-%   ipn = d/dt (C * vpn);
-% - fe: 0
-% - qe: C * vpn
+% - input current equation:
+%   ipinref = vpinref / Rin;
+%       fe: vpinref / Rin
+%       qe: 0
+% - output voltage equation:
+%   vpoutref = d/dt ( k * vpinref );
+%       fe: 0
+%       qe: k*vpinref
 %
-%Examples
-%--------
-% % adding a capacitor of value 10uF to an existing circuitdata structure
-% cktdata = add_element(cktdata, capModSpec(), 'C1', {'n1', 'n2'}, 1e-5);
-% %                                   ^         ^          ^        ^
-% %                        capacitor model      name      nodes  capacitance
-%
-%See also
-%--------
-% 
-% add_element, circuitdata[TODO], ModSpec, supported_ModSpec_devices[TODO],
-% DAEAPI, DAE_concepts
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Type "help MAPPlicense" at the MATLAB/Octave prompt to see the license      %
@@ -33,15 +25,6 @@ function MOD = my_differentiator(uniqID)
 %% Copyright (C) 2008-2013 Jaijeet Roychowdhury <jr@berkeley.edu>. All rights  %
 %% reserved.                                                                   %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%change log:
-%-----------
-%2014/05/13: Bichen Wu <bichen@berkeley.edu> Added the function handle of fqei
-%            and fqeiJ to reduce redundant calling of f/q functions and to
-%            improve efficiency
-%2016/06/13: JR <jr@berkeley.edu> removed eval() in functions and flag checking (for efficiency); found no fqeiJ, added that; all for efficiency.
-
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
@@ -131,7 +114,25 @@ function [fe, qe, fi, qi] = fqei(vecX, vecY, vecU, flag, MOD)
     %     evalstr = sprintf('%s = vecX(i);', oios{i});
     %     eval(evalstr); % should be OK for vecvalder
     % end
-    
+
+
+    % DEBUG
+
+    % printf('printing value of vecX\n');
+    % vecX
+    % printf('printing datatype of vecX\n');
+    % typeinfo(vecX)
+
+    % printf('printing values of vpinref and ipoutref\n');
+    % vpinref = vecX(1)
+    % ipoutref = vecX(2)
+
+    % printf('printing datatype of vpinref and ipoutref\n');
+    % typeinfo(vecX(1))
+    % typeinfo(vecX(2))
+
+    % DEBUG
+
     vpinref = vecX(1);
     ipoutref = vecX(2);
 
@@ -146,11 +147,13 @@ function [fe, qe, fi, qi] = fqei(vecX, vecY, vecU, flag, MOD)
     %}
 
     % equation for ipinref
-    fe(1, 1) = vpinref/Rin;
+    fe(1) = vpinref/Rin;
     qe(1, 1) = 0;
+
     % equation for vpoutref
-    fe(2, 1) = k*vpinref;
-    qe(2, 1) = 0;
+    fe(2, 1) = 0;
+    qe(2) = k*vpinref;
+
     % implicit equations
     fi = [];
     qi = [];
@@ -202,24 +205,24 @@ function [fqei, J] = fqeiJ(varargin)
 
     % fqei definitions
     % equation for ipinref
-    fqei.fe(1, 1) = vpinref/Rin;
+    fqei.fe(1) = vpinref/Rin;
     fqei.qe(1, 1) = 0;
 
     % equation for vpoutref
-    fqei.fe(2, 1) = k*vpinref;
-    fqei.qe(2, 1) = 0;
+    fqei.fe(2, 1) = 0;
+    fqei.qe(2) = k*vpinref;
 
     % implicit equations
     fqei.fi = [];
     fqei.qi = [];
 
     % J definitions
-    J.Jfe.dfe_dvecX = sparse([1.0/Rin 0.0; k 0.0]);
+    J.Jfe.dfe_dvecX = sparse([1.0/Rin 0.0; 0.0 0.0]);
     J.Jfe.dfe_dvecY = sparse(2,0);
     J.Jfe.dfe_dvecLim = sparse(2,0);
     J.Jfe.dfe_dvecU = sparse(2,0);
 
-    J.Jqe.dqe_dvecX = sparse([0.0 0.0; 0.0 0.0]);
+    J.Jqe.dqe_dvecX = sparse([0.0 0.0; k 0.0]);
     J.Jqe.dqe_dvecY = sparse(2,0);
     J.Jqe.dqe_dvecLim = sparse(2,0);
     J.Jqe.dqe_dvecU = sparse(2,0);
