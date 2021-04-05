@@ -1,2 +1,3 @@
 this is a file in the new branch 1
+edited after the master has changed this file
 
